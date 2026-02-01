@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Legacy Knowledge Extraction – Demo</title>
+<style>
+  :root {
+    --blue-dark: #1a3a5c;
+    --blue-mid: #2c5f8a;
+    --blue-light: #4a90c4;
+    --blue-pale: #d6e8f7;
+    --orange-dark: #b8660a;
+    --orange-mid: #d4880e;
+    --orange-light: #f0a830;
+    --orange-pale: #fef3dc;
+    --green: #2e7d32;
+    --red: #c62828;
+    --bg: #eef2f7;
+    --card-bg: #ffffff;
+    --shadow: 0 2px 12px rgba(0,0,0,0.10);
+    --radius: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: #222;
+    min-height: 100vh;
+  }
+
+  header {
+    background: linear-gradient(135deg, var(--blue-dark), var(--blue-mid));
+    color: white;
+    text-align: center;
+    padding: 28px 20px 18px;
+  }
+  header h1 { font-size: 1.8rem; font-weight: 700; }
+  header p { font-size: 0.95rem; opacity: 0.85; margin-top: 4px; font-style: italic; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px 16px 40px; }
+
+  /* ---------- Input Panel ---------- */
+  .input-panel {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    margin-bottom: 28px;
+  }
+  .input-panel h2 {
+    font-size: 1.1rem;
+    color: var(--blue-dark);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .input-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+  }
+  .input-grid label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .input-grid input, .input-grid select {
+    margin-top: 4px;
+    padding: 8px 10px;
+    border: 1.5px solid #cdd5de;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    transition: border-color 0.2s;
+  }
+  .input-grid input:focus, .input-grid select:focus {
+    outline: none;
+    border-color: var(--blue-light);
+  }
+
+  .run-btn {
+    margin-top: 18px;
+    padding: 12px 36px;
+    background: linear-gradient(135deg, var(--blue-mid), var(--blue-dark));
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .run-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(26,58,92,0.3); }
+  .run-btn:active { transform: translateY(0); }
+  .run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ---------- Pipeline layers ---------- */
+  .layer { margin-bottom: 8px; }
+
+  .layer-header {
+    text-align: center;
+    padding: 14px;
+    border-radius: var(--radius) var(--radius) 0 0;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: white;
+    position: relative;
+  }
+  .layer-header.blue { background: linear-gradient(135deg, var(--blue-dark), var(--blue-mid)); }
+  .layer-header.orange { background: linear-gradient(135deg, var(--orange-dark), var(--orange-mid)); }
+  .layer-header.teal {
+    background: linear-gradient(135deg, #1a5c5c, #2a8a7a);
+  }
+  .layer-header small { display: block; font-weight: 400; font-size: 0.8rem; opacity: 0.85; }
+
+  .layer-body {
+    background: var(--card-bg);
+    border-radius: 0 0 var(--radius) var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+  }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+
+  .card {
+    border-radius: 8px;
+    padding: 16px;
+    border-left: 5px solid var(--blue-mid);
+    background: var(--blue-pale);
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.5s, transform 0.5s;
+  }
+  .card.visible { opacity: 1; transform: translateY(0); }
+  .card.orange-card { border-left-color: var(--orange-mid); background: var(--orange-pale); }
+  .card.teal-card { border-left-color: #2a8a7a; background: #dcf0ec; }
+
+  .card h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin-bottom: 10px;
+    color: var(--blue-dark);
+  }
+  .card.orange-card h3 { color: var(--orange-dark); }
+  .card.teal-card h3 { color: #1a5c5c; }
+
+  .card .row { display: flex; gap: 6px; margin-bottom: 5px; font-size: 0.88rem; }
+  .card .row .lbl { font-weight: 700; color: #444; min-width: 110px; }
+  .card .row .val { color: #222; word-break: break-word; }
+
+  .card table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin-top: 6px;
+  }
+  .card table th {
+    background: var(--blue-mid);
+    color: white;
+    padding: 6px 10px;
+    text-align: left;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+  }
+  .card.orange-card table th { background: var(--orange-mid); }
+  .card table td { padding: 6px 10px; border-bottom: 1px solid #ddd; }
+
+  /* Arrow between layers */
+  .arrow {
+    text-align: center;
+    padding: 8px 0;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .arrow.visible { opacity: 1; }
+  .arrow svg { width: 36px; height: 36px; }
+  .arrow.blue svg path { fill: var(--blue-mid); }
+  .arrow.orange svg path { fill: var(--orange-mid); }
+  .arrow.teal svg path { fill: #2a8a7a; }
+
+  /* Outcome badge */
+  .outcome {
+    display: inline-block;
+    padding: 6px 18px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 1rem;
+    margin-top: 6px;
+  }
+  .outcome.decline { background: #fde0e0; color: var(--red); }
+  .outcome.approve { background: #e0f5e0; color: var(--green); }
+
+  /* COBOL viewer */
+  .cobol-viewer {
+    margin-top: 14px;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    border-radius: 8px;
+    padding: 14px;
+    font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    max-height: 240px;
+    overflow-y: auto;
+    white-space: pre;
+  }
+  .cobol-viewer .kw { color: #89b4fa; font-weight: 700; }
+  .cobol-viewer .cmt { color: #6c7086; font-style: italic; }
+  .cobol-viewer .str { color: #a6e3a1; }
+  .cobol-viewer .highlight-line { background: rgba(249,226,175,0.12); display: inline-block; width: 100%; }
+
+  /* Promo flags */
+  .flags { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+  .flag {
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .flag.active { background: #e0f5e0; color: var(--green); }
+  .flag.inactive { background: #eee; color: #888; }
+
+  /* Audit table */
+  #audit-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  #audit-table th {
+    background: var(--orange-mid);
+    color: white;
+    padding: 8px 12px;
+    text-align: left;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+  }
+  #audit-table td { padding: 8px 12px; border-bottom: 1px solid #e8e8e8; }
+  #audit-table tr:nth-child(even) { background: #fafafa; }
+
+  .hidden { display: none; }
+
+  @media (max-width: 700px) {
+    .cards { grid-template-columns: 1fr; }
+    .input-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Legacy Knowledge Extraction</h1>
+  <p>Legacy Extraction as the Authoritative Source of Truth for Decisions</p>
+</header>
+
+<div class="container">
+
+  <!-- Input Panel -->
+  <div class="input-panel">
+    <h2>Transaction Scenario</h2>
+    <div class="input-grid">
+      <label>Customer ID
+        <input id="in-cust" type="text" value="A55984">
+      </label>
+      <label>Question
+        <input id="in-question" type="text" value="Why was my transaction declined?">
+      </label>
+      <label>Credit Limit ($)
+        <input id="in-limit" type="number" step="0.01" value="5000.00">
+      </label>
+      <label>Current Balance ($)
+        <input id="in-balance" type="number" step="0.01" value="4200.00">
+      </label>
+      <label>Transaction Amount ($)
+        <input id="in-amount" type="number" step="0.01" value="950.00">
+      </label>
+      <label>Merchant Code
+        <input id="in-merchant" type="text" value="FR8062">
+      </label>
+      <label>Transaction Type
+        <select id="in-txn-type">
+          <option value="Travel" selected>Travel</option>
+          <option value="Retail">Retail</option>
+          <option value="Dining">Dining</option>
+          <option value="Online">Online</option>
+        </select>
+      </label>
+      <label>Product
+        <input id="in-product" type="text" value="CC-Limited">
+      </label>
+      <label>Promo Active
+        <select id="in-promo">
+          <option value="true" selected>Yes</option>
+          <option value="false">No</option>
+        </select>
+      </label>
+    </div>
+    <button class="run-btn" id="run-btn" onclick="runPipeline()">Run Decision Pipeline</button>
+  </div>
+
+  <!-- Layer 1: Legacy Knowledge Extraction -->
+  <div class="layer" id="layer-legacy">
+    <div class="layer-header blue">Legacy Knowledge Extraction</div>
+    <div class="layer-body">
+      <div class="cards" id="cards-legacy"></div>
+    </div>
+  </div>
+
+  <div class="arrow blue" id="arrow-1">
+    <svg viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" transform="rotate(90 12 12)"/></svg>
+  </div>
+
+  <!-- Layer 2: XAI Decision Plane -->
+  <div class="layer" id="layer-xai">
+    <div class="layer-header teal">XAI Decision Plane<small>(Explainable AI Control Plane)</small></div>
+    <div class="layer-body">
+      <div class="cards" id="cards-xai"></div>
+    </div>
+  </div>
+
+  <div class="arrow teal" id="arrow-2">
+    <svg viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" transform="rotate(90 12 12)"/></svg>
+  </div>
+
+  <!-- Layer 3: Runtime Decision Flow -->
+  <div class="layer" id="layer-runtime">
+    <div class="layer-header blue">Runtime Decision Flow</div>
+    <div class="layer-body">
+      <div class="cards" id="cards-runtime"></div>
+    </div>
+  </div>
+
+  <div class="arrow orange" id="arrow-3">
+    <svg viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" transform="rotate(90 12 12)"/></svg>
+  </div>
+
+  <!-- Layer 4: Immutable Decision Records -->
+  <div class="layer" id="layer-record">
+    <div class="layer-header orange">Immutable Decision Records</div>
+    <div class="layer-body">
+      <div class="cards" id="cards-record"></div>
+      <div id="cobol-section" class="hidden" style="margin-top:18px;">
+        <h3 style="font-size:0.9rem; color:var(--blue-dark); margin-bottom:8px;">Source COBOL Rule (CB109.cbl)</h3>
+        <div class="cobol-viewer" id="cobol-code"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audit History -->
+  <div style="margin-top: 32px;">
+    <div class="layer-header orange" style="border-radius: var(--radius) var(--radius) 0 0;">
+      Decision Audit History
+    </div>
+    <div class="layer-body" style="border-radius: 0 0 var(--radius) var(--radius);">
+      <table id="audit-table">
+        <thead>
+          <tr>
+            <th>Decision ID</th><th>Date</th><th>Time</th><th>Rule</th><th>Outcome</th><th>Reason</th>
+          </tr>
+        </thead>
+        <tbody id="audit-body"></tbody>
+      </table>
+      <p id="audit-empty" style="text-align:center;color:#888;padding:16px;">No decisions yet. Run the pipeline above.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const COBOL_SNIPPET = `      *================================================================
+      * VALIDATE-TRANSACTION: Core transaction validation
+      * RULE: CB109-R3
+      * Lines 340-355: Credit limit check
+      *================================================================
+       VALIDATE-TRANSACTION.
+      *--- CB109-R3: CREDIT LIMIT VALIDATION RULE ---
+      *--- If the projected balance exceeds the credit limit,
+      *--- decline the transaction immediately.
+           IF WS-TEMP-BALANCE > ACCT-CREDIT-LIMIT
+               MOVE 'Y' TO WS-DECLINE-FLAG
+               MOVE 'OVER_CREDIT_LIMIT' TO WS-DECISION-REASON
+               PERFORM LOG-DECLINE
+           END-IF
+           .`;
+
+function highlightCobol(src) {
+  return src.split('\\n').map(line => {
+    if (line.trim().startsWith('*')) return `<span class="cmt">${esc(line)}</span>`;
+    let h = esc(line);
+    h = h.replace(/\\b(IF|THEN|ELSE|END-IF|MOVE|TO|PERFORM|COMPUTE|DISPLAY|CONTINUE|STOP RUN)\\b/g, '<span class="kw">$1</span>');
+    h = h.replace(/'([^']*)'/g, `<span class="str">'$1'</span>`);
+    if (line.includes('WS-TEMP-BALANCE') && line.includes('ACCT-CREDIT-LIMIT')) {
+      return `<span class="highlight-line">${h}</span>`;
+    }
+    return h;
+  }).join('\\n');
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function $(id) { return document.getElementById(id); }
+
+function money(v) { return '$' + Number(v).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+function animateCards(containerId, delay) {
+  setTimeout(() => {
+    document.querySelectorAll(`#${containerId} .card`).forEach((c, i) => {
+      setTimeout(() => c.classList.add('visible'), i * 200);
+    });
+  }, delay);
+}
+
+function showArrow(id, delay) {
+  setTimeout(() => $(id).classList.add('visible'), delay);
+}
+
+async function runPipeline() {
+  const btn = $('run-btn');
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+
+  // Clear previous
+  ['cards-legacy','cards-xai','cards-runtime','cards-record'].forEach(id => $(id).innerHTML = '');
+  ['arrow-1','arrow-2','arrow-3'].forEach(id => $(id).classList.remove('visible'));
+  $('cobol-section').classList.add('hidden');
+
+  const body = {
+    customer_id: $('in-cust').value,
+    question: $('in-question').value,
+    account_credit_limit: parseFloat($('in-limit').value),
+    account_current_balance: parseFloat($('in-balance').value),
+    transaction_amount: parseFloat($('in-amount').value),
+    merchant_code: $('in-merchant').value,
+    transaction_type: $('in-txn-type').value,
+    product: $('in-product').value,
+    promo_active: $('in-promo').value === 'true',
+  };
+
+  try {
+    const res = await fetch('/api/pipeline', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    renderLegacy(data.legacy_knowledge);
+    animateCards('cards-legacy', 100);
+
+    showArrow('arrow-1', 800);
+
+    setTimeout(() => {
+      renderXAI(data.xai_plane);
+      animateCards('cards-xai', 0);
+    }, 1000);
+
+    showArrow('arrow-2', 1800);
+
+    setTimeout(() => {
+      renderRuntime(data.runtime_decision);
+      animateCards('cards-runtime', 0);
+    }, 2000);
+
+    showArrow('arrow-3', 2800);
+
+    setTimeout(() => {
+      renderRecord(data.immutable_record);
+      animateCards('cards-record', 0);
+      $('cobol-section').classList.remove('hidden');
+      $('cobol-code').innerHTML = highlightCobol(COBOL_SNIPPET);
+      refreshAudit();
+    }, 3000);
+
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    setTimeout(() => { btn.disabled = false; btn.textContent = 'Run Decision Pipeline'; }, 3200);
+  }
+}
+
+function renderLegacy(lk) {
+  const rulesHtml = lk.business_rules.map(r => `
+    <tr><td><strong>${esc(r.rule_id)}</strong></td><td>${esc(r.condition)}</td><td>${esc(r.action)}</td></tr>
+  `).join('');
+
+  const fieldsHtml = lk.canonical_data.map(f => `
+    <tr><td>${esc(f.field_name)}</td><td>${esc(f.field_type)}</td><td>${f.scale ?? '-'}</td></tr>
+  `).join('');
+
+  $('cards-legacy').innerHTML = `
+    <div class="card">
+      <h3>Explicit Business Rules</h3>
+      <table>
+        <tr><th>Rule</th><th>Condition</th><th>Action</th></tr>
+        ${rulesHtml}
+      </table>
+    </div>
+    <div class="card">
+      <h3>Canonical Data &amp; Signals</h3>
+      <table>
+        <tr><th>Field Name</th><th>Type</th><th>Scale</th></tr>
+        ${fieldsHtml}
+      </table>
+    </div>
+    <div class="card orange-card">
+      <h3>Decision Trace Authority</h3>
+      <div class="row"><span class="lbl">FILE:</span><span class="val">${esc(lk.decision_trace.file)}</span></div>
+      <div class="row"><span class="lbl">RULE:</span><span class="val">${esc(lk.decision_trace.rule)}</span></div>
+      <div class="row"><span class="lbl">LINES:</span><span class="val">${esc(lk.decision_trace.lines)}</span></div>
+    </div>
+  `;
+}
+
+function renderXAI(xai) {
+  $('cards-xai').innerHTML = `
+    <div class="card teal-card">
+      <h3>Canonical Questions</h3>
+      <div class="row"><span class="lbl">USER CX-ID:</span><span class="val">${esc(xai.canonical_question.user_cx_id)}</span></div>
+      <div class="row"><span class="lbl">QUESTION:</span><span class="val">"${esc(xai.canonical_question.question)}"</span></div>
+    </div>
+    <div class="card teal-card">
+      <h3>Slot Schemas &amp; Signals</h3>
+      <div class="row"><span class="lbl">TIME PERIOD:</span><span class="val">${esc(xai.slot_schema.time_period || '')}</span></div>
+      <div class="row"><span class="lbl">PRODUCT:</span><span class="val">${esc(xai.slot_schema.product || '')}</span></div>
+      <div class="row"><span class="lbl">MERCHANT:</span><span class="val">${esc(xai.slot_schema.merchant || '')}</span></div>
+      <div class="row"><span class="lbl">TRANSACTION:</span><span class="val">${esc(xai.slot_schema.transaction_type || '')}</span></div>
+    </div>
+    <div class="card orange-card">
+      <h3>Governed Reasoning</h3>
+      <div class="row"><span class="lbl">DECISION_ID:</span><span class="val">${esc(xai.governed_reasoning.decision_id)}</span></div>
+      <div class="row"><span class="lbl">DATE:</span><span class="val">${esc(xai.governed_reasoning.date)}</span></div>
+      <div class="row"><span class="lbl">TIME:</span><span class="val">${esc(xai.governed_reasoning.time)}</span></div>
+    </div>
+  `;
+}
+
+function renderRuntime(rt) {
+  const eval0 = rt.rule_evaluations[0];
+  const passed = eval0.result;
+  const outcomeClass = rt.outcome === 'DECLINE' ? 'decline' : 'approve';
+
+  let promoHtml = '';
+  if (rt.promo_evaluation) {
+    const flags = rt.promo_evaluation.promo_flags.map(f => `<span class="flag active">${esc(f)}</span>`).join('');
+    promoHtml = `
+      <div class="row" style="margin-top:8px;"><span class="lbl">PROMO_ACTIVE:</span><span class="val">${rt.promo_evaluation.promo_active ? 'TRUE' : 'FALSE'}</span></div>
+      <div class="flags">${flags}</div>
+    `;
+  }
+
+  $('cards-runtime').innerHTML = `
+    <div class="card">
+      <h3>Canonical Questions</h3>
+      <div class="row"><span class="lbl">USER CX-ID:</span><span class="val">${esc($('in-cust').value)}</span></div>
+      <div class="row"><span class="lbl">QUESTION:</span><span class="val">"${esc($('in-question').value)}"</span></div>
+    </div>
+    <div class="card">
+      <h3>Governed Reasoning</h3>
+      <div class="row">
+        <span class="lbl">RULE:</span>
+        <span class="val"><strong>${esc(eval0.expression)}</strong></span>
+      </div>
+      <div class="row">
+        <span class="lbl">VALUES:</span>
+        <span class="val">${money(eval0.left_value)} ${eval0.operator} ${money(eval0.right_value)} = <strong>${passed ? 'TRUE' : 'FALSE'}</strong></span>
+      </div>
+      ${promoHtml}
+      <div style="margin-top:12px;">
+        <span class="outcome ${outcomeClass}">${rt.outcome}</span>
+      </div>
+    </div>
+    <div class="card orange-card">
+      <h3>Immutable Decision Records</h3>
+      <div class="row"><span class="lbl">OUTCOME:</span><span class="val"><strong>${esc(rt.outcome)}</strong></span></div>
+      <div class="row"><span class="lbl">REASON:</span><span class="val">${esc(rt.reason)}</span></div>
+    </div>
+  `;
+}
+
+function renderRecord(rec) {
+  $('cards-record').innerHTML = `
+    <div class="card orange-card" style="max-width:480px;margin:0 auto;">
+      <h3>Final Immutable Decision Record</h3>
+      <div class="row"><span class="lbl">DECISION_ID:</span><span class="val"><strong>${esc(rec.decision_id)}</strong></span></div>
+      <div class="row"><span class="lbl">DATE:</span><span class="val">${esc(rec.date)}</span></div>
+      <div class="row"><span class="lbl">TIME:</span><span class="val">${esc(rec.time)}</span></div>
+      <div class="row"><span class="lbl">RULE:</span><span class="val">${esc(rec.rule)}</span></div>
+      <div class="row"><span class="lbl">OUTCOME:</span><span class="val"><span class="outcome ${rec.outcome === 'DECLINE' ? 'decline' : 'approve'}">${esc(rec.outcome)}</span></span></div>
+      <div class="row"><span class="lbl">REASON:</span><span class="val">${esc(rec.reason)}</span></div>
+    </div>
+  `;
+}
+
+async function refreshAudit() {
+  try {
+    const res = await fetch('/api/records');
+    const records = await res.json();
+    if (records.length === 0) {
+      $('audit-empty').style.display = '';
+      $('audit-body').innerHTML = '';
+      return;
+    }
+    $('audit-empty').style.display = 'none';
+    $('audit-body').innerHTML = records.map(r => `
+      <tr>
+        <td><strong>${esc(r.decision_id)}</strong></td>
+        <td>${esc(r.date)}</td>
+        <td>${esc(r.time)}</td>
+        <td>${esc(r.rule)}</td>
+        <td><span class="outcome ${r.outcome === 'DECLINE' ? 'decline' : 'approve'}" style="font-size:0.82rem;padding:3px 12px;">${esc(r.outcome)}</span></td>
+        <td>${esc(r.reason)}</td>
+      </tr>
+    `).join('');
+  } catch(e) { /* ignore */ }
+}
+
+// Load audit on page load
+refreshAudit();
+</script>
+</body>
+</html>
